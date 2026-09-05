@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistem Absensi Karyawan</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet CSS & JS untuk Peta -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="bg-gray-100 flex justify-center min-h-screen p-4">
+
+  <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-5 flex flex-col gap-4">
+    
+    <!-- Header & Profil -->
+    <div class="bg-blue-900 text-white rounded-xl p-4 text-center font-bold">
+      Sistem Absensi Karyawan
+    </div>
+    <div class="flex items-center gap-3 border-b pb-3 relative">
+      <!-- [DIUBAH] Menambahkan ID agar bisa diubah otomatis oleh JavaScript -->
+      <div id="userInitials" class="w-10 h-10 bg-blue-800 text-white font-bold rounded-full flex items-center justify-center">?</div>
+      <div>
+        <h3 id="userName" class="font-bold text-gray-800">Memuat...</h3>
+        <p id="userRole" class="text-xs text-gray-500">-</p>
+      </div>
+      <!-- Tombol Logout -->
+      <button onclick="logout()" class="absolute right-0 top-2 text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded">Logout</button>
+    </div>
+
+    <!-- Jam Realtime -->
+    <div class="text-center bg-gray-50 p-3 rounded-xl border">
+      <div id="liveClock" class="text-2xl font-bold text-gray-800">00:00:00</div>
+      <div class="flex justify-center gap-2 text-xs text-gray-500 mt-1">
+        <span>Belum Clock In</span> | <span>Belum Clock Out</span>
+      </div>
+    </div>
+
+    <!-- Status Geolokasi & Peta -->
+    <div class="border rounded-xl p-3 bg-gray-50">
+      <div class="flex justify-between text-xs font-semibold mb-2">
+        <span>Jarak: <strong id="distText">0 m</strong></span>
+        <span>Akurasi GPS: <strong id="accText">±0m</strong></span>
+      </div>
+      
+      <!-- Peta Leaflet -->
+      <div id="map" class="h-40 w-full rounded-lg border"></div>
+      
+      <div id="statusGeo" class="text-xs text-red-500 font-semibold text-center mt-2">
+        Memeriksa lokasi...
+      </div>
+    </div>
+
+    <!-- Tombol Aksi -->
+    <div class="grid grid-cols-2 gap-2">
+      <button id="btnIn" onclick="submitAbsen('MASUK')" class="bg-blue-900 text-white py-2 rounded-lg font-semibold disabled:opacity-50" disabled>
+        Presensi Masuk
+      </button>
+      <button id="btnOut" onclick="submitAbsen('PULANG')" class="bg-amber-100 text-amber-800 py-2 rounded-lg font-semibold disabled:opacity-50" disabled>
+        Presensi Pulang
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    // [DIUBAH] 1. Cek Sesi Login Karyawan
+    // Membaca data yang disimpan saat login di index.html
+    const sessionData = localStorage.getItem("session_absen");
+    let currentUser = "Tidak Diketahui";
+    
+    if (!sessionData) {
+      // Jika belum login, tendang kembali ke halaman index (login)
+      window.location.href = "index.html";
+    } else {
+      // Jika sudah login, ubah profil di layar
+      const user = JSON.parse(sessionData);
+      currentUser = user.nama;
+      document.getElementById("userName").innerText = user.nama;
+      document.getElementById("userRole").innerText = user.jabatan || "Security";
+      // Ambil 2 huruf pertama untuk inisial (misal: Yasir Arafat -> YA)
+      document.getElementById("userInitials").innerText = user.nama.substring(0,2).toUpperCase();
+    }
+
+    // Fungsi Logout
+    function logout() {
+      localStorage.removeItem("session_absen");
+      window.location.href = "index.html";
+    }
+
+    // 2. Konfigurasi Koordinat Kantor (Target)
+    const OFFICE_LAT = -6.175392; 
+    const OFFICE_LNG = 106.827153;
+    const MAX_RADIUS_METERS = 50; // Jarak maksimal absen (50 meter)
+
+    let userLat = 0, userLng = 0, currentDistance = 0;
+    let map, marker;
+
+    // 3. Jam Realtime
+    setInterval(() => {
+      document.getElementById('liveClock').innerText = new Date().toLocaleTimeString('id-ID');
+    }, 1000);
+
+    // 4. Formula Haversine (Hitung Jarak)
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+    }
+
+    // 5. Inisialisasi Peta & Geolokasi
+    function initGeolocation() {
+      map = L.map('map').setView([OFFICE_LAT, OFFICE_LNG], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+      if ("geolocation" in navigator) {
+        navigator.geolocation.watchPosition((pos) => {
+          userLat = pos.coords.latitude;
+          userLng = pos.coords.longitude;
+          const accuracy = Math.round(pos.coords.accuracy);
+          currentDistance = calculateDistance(userLat, userLng, OFFICE_LAT, OFFICE_LNG);
+
+          // Update UI
+          document.getElementById('distText').innerText = `${currentDistance} m`;
+          document.getElementById('accText').innerText = `±${accuracy}m`;
+
+          // Update Marker
+          if (marker) map.removeLayer(marker);
+          marker = L.marker([userLat, userLng]).addTo(map);
+          map.setView([userLat, userLng], 16);
+
+          // Validasi Jarak
+          const btnIn = document.getElementById('btnIn');
+          const btnOut = document.getElementById('btnOut'); // [DIUBAH] Tombol pulang juga ikut divalidasi
+          const statusGeo = document.getElementById('statusGeo');
+
+          if (currentDistance <= MAX_RADIUS_METERS) {
+            statusGeo.innerText = "Lokasi Valid (Dalam Radius Kantor)";
+            statusGeo.className = "text-xs text-green-600 font-semibold text-center mt-2";
+            btnIn.disabled = false;
+            btnOut.disabled = false; 
+          } else {
+            statusGeo.innerText = `Terlalu Jauh dari Kantor (Max ${MAX_RADIUS_METERS}m)`;
+            statusGeo.className = "text-xs text-red-500 font-semibold text-center mt-2";
+            btnIn.disabled = true;
+            btnOut.disabled = true;
+          }
+        }, (err) => {
+          document.getElementById('statusGeo').innerText = "Gagal mengambil lokasi: " + err.message;
+        }, { enableHighAccuracy: true, timeout: 10000 });
+      }
+    }
+
+    // 6. Kirim Data ke Backend (GAS Web App)
+    function submitAbsen(tipe) {
+      // [DIUBAH] Payload sekarang menyertakan nama orang yang login dan info jarak
+      const payload = {
+        action: "absen",
+        nama: currentUser, 
+        tipe: tipe,
+        lat: userLat,
+        lng: userLng,
+        jarak: currentDistance
+      };
+      
+      // PASTIKAN URL INI SAMA DENGAN YANG ADA DI index.html
+      const GAS_URL = "https://script.google.com/macros/s/AKfycb.../exec";
+
+      const btnIn = document.getElementById('btnIn');
+      const btnOut = document.getElementById('btnOut');
+      btnIn.disabled = true;
+      btnOut.disabled = true;
+
+      fetch(GAS_URL, {
+        method: 'POST',
+        // [DIUBAH] Hapus mode: 'no-cors' karena kita butuh membaca respons JSON dari server
+        body: JSON.stringify(payload)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if(data.status === "success"){
+          alert(`Presensi ${tipe} Berhasil Disimpan!`);
+        } else {
+          alert(`Gagal: ${data.message}`);
+        }
+      })
+      .catch(err => {
+        alert("Error jaringan: " + err);
+      })
+      .finally(() => {
+        btnIn.disabled = false;
+        btnOut.disabled = false;
+      });
+    }
+
+    window.onload = initGeolocation;
+  </script>
+</body>
+</html>
