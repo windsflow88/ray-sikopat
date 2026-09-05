@@ -23,9 +23,9 @@
         
         <div class="flex flex-col gap-1">
           <label class="text-xs text-gray-500">Pilih Nama Anda</label>
+          <!-- Dropdown ini sekarang kosong dan akan diisi otomatis oleh JavaScript -->
           <select id="nama" class="border rounded-lg p-2 text-sm bg-gray-50 focus:outline-none focus:border-blue-900">
-            <option value="Yasir Arafat">Yasir Arafat</option>
-            <option value="Karyawan Lain">Karyawan Lain</option>
+            <option value="">Memuat daftar nama...</option>
           </select>
         </div>
 
@@ -35,7 +35,7 @@
                  class="border rounded-lg p-2 text-sm bg-gray-50 focus:outline-none focus:border-blue-900 text-center tracking-widest">
         </div>
 
-        <button type="submit" id="btnSubmit" class="bg-blue-900 text-white font-semibold py-2 rounded-lg text-sm mt-2 transition hover:bg-blue-800">
+        <button type="submit" id="btnSubmit" class="bg-blue-900 text-white font-semibold py-2 rounded-lg text-sm mt-2 transition hover:bg-blue-800 disabled:opacity-50">
           Masuk
         </button>
 
@@ -44,15 +44,52 @@
   </div>
 
   <script>
-    // MASUKKAN URL WEB APP GOOGLE APPS SCRIPT ANDA DI BAWAH INI
+    // WAJIB GANTI URL DI BAWAH INI DENGAN URL WEB APP GAS MILIK ANDA
     const GAS_URL = "https://script.google.com/macros/s/AKfycb.../exec"; 
 
+    // 1. FUNGSI UNTUK MENGAMBIL DAFTAR NAMA DARI SPREADSHEET (SAAT HALAMAN DIBUKA)
+    window.addEventListener('DOMContentLoaded', () => {
+      const selectNama = document.getElementById("nama");
+      const btnSubmit = document.getElementById("btnSubmit");
+      
+      // Matikan tombol masuk sementara data nama belum selesai dimuat
+      btnSubmit.disabled = true;
+
+      fetch(GAS_URL) 
+        .then(response => response.json())
+        .then(res => {
+          selectNama.innerHTML = ""; // Bersihkan teks "Memuat daftar nama..."
+          
+          if (res.status === "success" && res.data.length > 0) {
+            res.data.forEach(namaKaryawan => {
+              const option = document.createElement("option");
+              option.value = namaKaryawan;
+              option.textContent = namaKaryawan;
+              selectNama.appendChild(option);
+            });
+            btnSubmit.disabled = false; // Aktifkan kembali tombol setelah nama berhasil dimuat
+          } else {
+            selectNama.innerHTML = '<option value="">Data karyawan kosong</option>';
+          }
+        })
+        .catch(err => {
+          selectNama.innerHTML = '<option value="">Gagal memuat data dari server</option>';
+        });
+    });
+
+    // 2. FUNGSI UNTUK PROSES LOGIN (SAAT TOMBOL MASUK DITEKAN)
     document.getElementById("loginForm").addEventListener("submit", function(e) {
       e.preventDefault();
       
       const btn = document.getElementById("btnSubmit");
       const nama = document.getElementById("nama").value;
       const pin = document.getElementById("pin").value;
+
+      // Validasi tambahan jika nama belum terpilih
+      if (!nama) {
+        alert("Silakan pilih nama terlebih dahulu.");
+        return;
+      }
 
       btn.innerText = "Memeriksa...";
       btn.disabled = true;
@@ -64,7 +101,7 @@
       .then(response => response.json())
       .then(data => {
         if (data.status === "success") {
-          // Simpan sesi login
+          // Simpan sesi login ke browser
           localStorage.setItem("session_absen", JSON.stringify({
             nama: data.nama,
             jabatan: data.jabatan
