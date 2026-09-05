@@ -4,171 +4,298 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Sistem Absensi</title>
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Leaflet CSS & JS untuk Peta -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
-<body class="bg-gray-100 flex justify-center min-h-screen p-4">
+<body class="bg-gradient-to-br from-slate-100 to-blue-50 min-h-screen pb-24">
 
-  <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-5 flex flex-col gap-4">
-    
-    <!-- Header & Profil -->
-    <div class="bg-blue-900 text-white rounded-xl p-4 text-center font-bold">
-      Sistem Absensi Karyawan
+  <div class="w-full max-w-md mx-auto flex flex-col gap-4 p-4">
+
+    <!-- Header -->
+    <div class="bg-blue-900 text-white rounded-2xl p-6 flex flex-col items-center shadow-md">
+      <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center mb-2">
+        <span class="text-blue-900 font-bold italic text-xl">Ray</span>
+      </div>
+      <h1 class="text-sm font-semibold">Sistem Absensi Karyawan</h1>
     </div>
-    <div class="flex items-center gap-3 border-b pb-3 relative">
-      <div id="userInitials" class="w-10 h-10 bg-blue-800 text-white font-bold rounded-full flex items-center justify-center">?</div>
+
+    <!-- Profil -->
+    <div class="bg-white rounded-2xl shadow-sm p-4 flex items-center gap-3">
+      <div id="userInitials" class="w-10 h-10 bg-blue-900 text-white font-bold rounded-full flex items-center justify-center">?</div>
       <div>
-        <h3 id="userName" class="font-bold text-gray-800">Memuat...</h3>
+        <h3 id="userName" class="font-bold text-gray-800 text-sm">Memuat...</h3>
         <p id="userRole" class="text-xs text-gray-500">-</p>
       </div>
-      <!-- Tombol Logout -->
-      <button onclick="logout()" class="absolute right-0 top-2 text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded hover:bg-red-100">Logout</button>
+      <button onclick="logout()" class="ml-auto text-xs text-red-500 font-semibold bg-red-50 px-2 py-1 rounded-lg hover:bg-red-100">Logout</button>
     </div>
 
-    <!-- Jam Realtime -->
-    <div class="text-center bg-gray-50 p-3 rounded-xl border">
-      <div id="liveClock" class="text-2xl font-bold text-gray-800">00:00:00</div>
-      <div class="flex justify-center gap-2 text-xs text-gray-500 mt-1">
-        <span>Jam Kerja Realtime</span>
+    <!-- Jam -->
+    <div class="bg-white rounded-2xl shadow-sm p-4 text-center">
+      <div id="liveDate" class="text-xs text-gray-400 mb-1">-</div>
+      <div id="liveClock" class="text-3xl font-bold text-blue-900 tracking-wide">00:00:00</div>
+      <div class="flex justify-center gap-2 mt-3">
+        <span id="pillMasuk" class="text-[11px] font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-500">Belum Clock In</span>
+        <span id="pillPulang" class="text-[11px] font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-500">Belum Clock Out</span>
       </div>
     </div>
 
-    <!-- Status Geolokasi & Peta -->
-    <div class="border rounded-xl p-3 bg-gray-50">
-      <div class="flex justify-between text-xs font-semibold mb-2">
-        <span>Jarak: <strong id="distText">0 m</strong></span>
-        <span>Akurasi GPS: <strong id="accText">±0m</strong></span>
+    <!-- Geolokasi -->
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+      <div class="flex justify-between items-center mb-3">
+        <span class="text-xs font-semibold text-gray-600">📍 Status Geolokasi Realtime</span>
+        <span onclick="initGeolocation()" class="text-[11px] text-blue-700 font-semibold cursor-pointer">↻ Kalibrasi GPS</span>
       </div>
-      
-      <!-- Peta Leaflet -->
-      <div id="map" class="h-40 w-full rounded-lg border"></div>
-      
-      <div id="statusGeo" class="text-xs text-red-500 font-semibold text-center mt-2">
-        Memeriksa lokasi...
+
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <div class="bg-gray-50 rounded-xl p-2 text-center">
+          <div class="text-[10px] text-gray-400 font-semibold">JARAK KANTOR</div>
+          <div id="distText" class="text-sm font-bold text-gray-800">0 m</div>
+        </div>
+        <div class="bg-gray-50 rounded-xl p-2 text-center">
+          <div class="text-[10px] text-gray-400 font-semibold">AKURASI GPS</div>
+          <div id="accText" class="text-sm font-bold text-gray-800">±0 m</div>
+        </div>
+      </div>
+
+      <div id="statusBanner" class="rounded-xl p-2 grid grid-cols-2 gap-2 mb-2 bg-red-50">
+        <div>
+          <div class="text-[10px] text-red-400 font-semibold">STATUS KEHADIRAN</div>
+          <div id="statusGeo" class="text-xs font-bold text-red-600">Memeriksa lokasi...</div>
+        </div>
+        <div>
+          <div class="text-[10px] text-red-400 font-semibold">LOKASI TERDEKAT</div>
+          <div id="lokasiTerdekat" class="text-xs font-bold text-red-600">-</div>
+        </div>
+      </div>
+
+      <div id="map" class="h-40 w-full rounded-xl border"></div>
+    </div>
+
+    <!-- Presensi -->
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btnIn" onclick="submitAbsen('MASUK')" disabled
+          class="bg-blue-900 text-white py-2 rounded-lg font-semibold text-sm disabled:opacity-50 transition hover:bg-blue-800">
+          Presensi Masuk
+        </button>
+        <button id="btnOut" onclick="submitAbsen('PULANG')" disabled
+          class="bg-amber-100 text-amber-800 py-2 rounded-lg font-semibold text-sm disabled:opacity-50 transition hover:bg-amber-200">
+          Presensi Pulang
+        </button>
+      </div>
+      <div class="flex justify-between text-xs text-gray-500 mt-2 px-1">
+        <span>Masuk: <strong id="jamMasuk">--:--</strong></span>
+        <span>Pulang: <strong id="jamPulang">--:--</strong></span>
       </div>
     </div>
 
-    <!-- Tombol Aksi -->
-    <div class="grid grid-cols-2 gap-2">
-      <button id="btnIn" onclick="submitAbsen('MASUK')" class="bg-blue-900 text-white py-2 rounded-lg font-semibold disabled:opacity-50 transition hover:bg-blue-800" disabled>
-        Presensi Masuk
-      </button>
-      <button id="btnOut" onclick="submitAbsen('PULANG')" class="bg-amber-100 text-amber-800 py-2 rounded-lg font-semibold disabled:opacity-50 transition hover:bg-amber-200" disabled>
-        Presensi Pulang
-      </button>
+    <!-- Ijin / Cuti -->
+    <button onclick="openModal('modalIjin')"
+      class="bg-amber-50 border border-amber-300 text-amber-700 font-semibold py-3 rounded-2xl text-sm shadow-sm hover:bg-amber-100">
+      📄 Ajukan Ijin / Cuti
+    </button>
+
+    <!-- Lapor Patroli -->
+    <button onclick="openModal('modalPatroli')"
+      class="bg-white border border-blue-300 text-blue-800 font-semibold py-3 rounded-2xl text-sm shadow-sm hover:bg-blue-50">
+      🛡️ Lapor Patroli
+    </button>
+
+    <!-- Riwayat -->
+    <div class="bg-white rounded-2xl shadow-sm p-4">
+      <div class="flex justify-between items-center mb-2">
+        <span class="text-xs font-semibold text-gray-700">🕓 Riwayat 7 Hari Terakhir</span>
+      </div>
+      <div id="riwayatList" class="flex flex-col divide-y text-xs">
+        <div class="py-3 text-gray-400 text-center">Memuat riwayat...</div>
+      </div>
     </div>
 
+    <div class="text-center text-[10px] text-gray-400 pb-2">PT. Ray Mitra Perkasa</div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around py-2 text-[11px] max-w-md mx-auto md:rounded-t-xl md:shadow">
+    <button class="flex flex-col items-center text-blue-900 font-semibold">
+      <span class="text-base">▦</span>Dashboard
+    </button>
+    <button onclick="syncData()" class="flex flex-col items-center text-gray-500">
+      <span class="text-base">↻</span>Sync Data
+    </button>
+    <button onclick="logout()" class="flex flex-col items-center text-gray-500">
+      <span class="text-base">⏻</span>Logout
+    </button>
+  </div>
+
+  <!-- Modal Ijin / Cuti -->
+  <div id="modalIjin" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-sm">
+      <h3 class="font-bold text-gray-800 mb-3">Ajukan Ijin / Cuti</h3>
+      <form id="formIjin" class="flex flex-col gap-3">
+        <select id="jenisIjin" class="border rounded-lg p-2 text-sm bg-gray-50">
+          <option value="Ijin">Ijin</option>
+          <option value="Cuti">Cuti</option>
+          <option value="Sakit">Sakit</option>
+        </select>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] text-gray-500">Tanggal Mulai</label>
+            <input type="date" id="tglMulai" required class="border rounded-lg p-2 text-sm bg-gray-50">
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-[11px] text-gray-500">Tanggal Selesai</label>
+            <input type="date" id="tglSelesai" required class="border rounded-lg p-2 text-sm bg-gray-50">
+          </div>
+        </div>
+        <textarea id="keteranganIjin" placeholder="Keterangan" required rows="3" class="border rounded-lg p-2 text-sm bg-gray-50"></textarea>
+        <div class="flex gap-2 mt-1">
+          <button type="button" onclick="closeModal('modalIjin')" class="flex-1 py-2 rounded-lg text-sm border">Batal</button>
+          <button type="submit" class="flex-1 py-2 rounded-lg text-sm bg-blue-900 text-white font-semibold">Kirim</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Lapor Patroli -->
+  <div id="modalPatroli" class="fixed inset-0 bg-black/40 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-sm">
+      <h3 class="font-bold text-gray-800 mb-3">Lapor Patroli</h3>
+      <form id="formPatroli" class="flex flex-col gap-3">
+        <textarea id="catatanPatroli" placeholder="Catatan patroli (kondisi area, kejadian, dll)" required rows="4" class="border rounded-lg p-2 text-sm bg-gray-50"></textarea>
+        <div class="text-[11px] text-gray-400">Lokasi GPS Anda saat ini akan disertakan otomatis.</div>
+        <div class="flex gap-2 mt-1">
+          <button type="button" onclick="closeModal('modalPatroli')" class="flex-1 py-2 rounded-lg text-sm border">Batal</button>
+          <button type="submit" class="flex-1 py-2 rounded-lg text-sm bg-blue-900 text-white font-semibold">Kirim</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script>
-    // 1. Cek Sesi Login Karyawan
+    // WAJIB SAMA PERSIS DENGAN index.html
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbz6KrI9eJPFY9WvyPHXk4TWHWsvFR2KqrVnvMDGJ1xXIjPwOp4ZI_Do5NDAP-R7O-Xp/exec";
+
+    // 1. Sesi Login
     const sessionData = localStorage.getItem("session_absen");
     let currentUser = "Tidak Diketahui";
-    
     if (!sessionData) {
-      // Jika belum login, tendang kembali ke halaman index (login)
       window.location.href = "index.html";
     } else {
       const user = JSON.parse(sessionData);
       currentUser = user.nama;
       document.getElementById("userName").innerText = user.nama;
       document.getElementById("userRole").innerText = user.jabatan || "Karyawan";
-      // Ambil 2 huruf depan untuk inisial bulatan profil
-      document.getElementById("userInitials").innerText = user.nama.substring(0,2).toUpperCase();
+      document.getElementById("userInitials").innerText = user.nama.substring(0, 2).toUpperCase();
     }
 
-    // Fungsi Logout
     function logout() {
       localStorage.removeItem("session_absen");
       window.location.href = "index.html";
     }
 
-    // 2. KONFIGURASI KOORDINAT KANTOR & RADIUS
-    const OFFICE_LAT = -6.175392; // Ubah sesuai Latitude kantor Anda
-    const OFFICE_LNG = 106.827153; // Ubah sesuai Longitude kantor Anda
-    const MAX_RADIUS_METERS = 50; // Batas maksimal jarak (meter)
-
-    let userLat = 0, userLng = 0, currentDistance = 0;
-    let map, marker;
-
-    // 3. Jam Realtime (Format 24 Jam)
-    setInterval(() => {
-      document.getElementById('liveClock').innerText = new Date().toLocaleTimeString('id-ID', { hour12: false });
-    }, 1000);
-
-    // 4. Formula Haversine (Menghitung Jarak GPS ke Kantor)
-    function calculateDistance(lat1, lon1, lat2, lon2) {
-      const R = 6371e3; // Radius bumi dalam meter
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-      return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+    function openModal(id) {
+      const el = document.getElementById(id);
+      el.classList.remove('hidden');
+      el.classList.add('flex');
+    }
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      el.classList.add('hidden');
+      el.classList.remove('flex');
     }
 
-    // 5. Inisialisasi Peta & Pelacakan GPS Pengguna
-    function initGeolocation() {
-      map = L.map('map').setView([OFFICE_LAT, OFFICE_LNG], 15);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    // 2. Konfigurasi lokasi kantor (bisa lebih dari satu titik)
+    const OFFICE_LOCATIONS = [
+      { name: "PT RAY MITRA PERKASA", lat: -6.175392, lng: 106.827153 }
+    ];
+    const MAX_RADIUS_METERS = 50;
 
+    let userLat = 0, userLng = 0, currentDistance = 0, nearestName = "-";
+    let map, marker;
+    let sudahMasuk = false, sudahPulang = false;
+
+    // 3. Jam & Tanggal Realtime
+    setInterval(() => {
+      const now = new Date();
+      document.getElementById('liveClock').innerText = now.toLocaleTimeString('id-ID', { hour12: false });
+      document.getElementById('liveDate').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }, 1000);
+
+    // 4. Haversine
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    }
+
+    function findNearestOffice(lat, lng) {
+      let best = null, bestDist = Infinity;
+      OFFICE_LOCATIONS.forEach(o => {
+        const d = calculateDistance(lat, lng, o.lat, o.lng);
+        if (d < bestDist) { bestDist = d; best = o; }
+      });
+      return { name: best.name, distance: bestDist };
+    }
+
+    // 5. Geolokasi & Peta
+    function initGeolocation() {
+      if (!map) {
+        map = L.map('map').setView([OFFICE_LOCATIONS[0].lat, OFFICE_LOCATIONS[0].lng], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+      }
       if ("geolocation" in navigator) {
         navigator.geolocation.watchPosition((pos) => {
           userLat = pos.coords.latitude;
           userLng = pos.coords.longitude;
           const accuracy = Math.round(pos.coords.accuracy);
-          currentDistance = calculateDistance(userLat, userLng, OFFICE_LAT, OFFICE_LNG);
+          const nearest = findNearestOffice(userLat, userLng);
+          currentDistance = nearest.distance;
+          nearestName = nearest.name;
 
-          // Update Tampilan Angka Jarak & Akurasi
           document.getElementById('distText').innerText = `${currentDistance} m`;
-          document.getElementById('accText').innerText = `±${accuracy}m`;
+          document.getElementById('accText').innerText = `±${accuracy} m`;
+          document.getElementById('lokasiTerdekat').innerText = nearestName;
 
-          // Update Posisi Pin di Peta
           if (marker) map.removeLayer(marker);
           marker = L.marker([userLat, userLng]).addTo(map);
           map.setView([userLat, userLng], 16);
 
-          // Validasi Tombol Berdasarkan Jarak Radius
+          const banner = document.getElementById('statusBanner');
+          const statusGeo = document.getElementById('statusGeo');
+          const lokasiTerdekat = document.getElementById('lokasiTerdekat');
           const btnIn = document.getElementById('btnIn');
           const btnOut = document.getElementById('btnOut');
-          const statusGeo = document.getElementById('statusGeo');
 
           if (currentDistance <= MAX_RADIUS_METERS) {
-            statusGeo.innerText = "Lokasi Valid (Dalam Radius Kantor)";
-            statusGeo.className = "text-xs text-green-600 font-semibold text-center mt-2";
-            btnIn.disabled = false;
-            btnOut.disabled = false; 
+            banner.className = "rounded-xl p-2 grid grid-cols-2 gap-2 mb-2 bg-green-50";
+            statusGeo.className = "text-xs font-bold text-green-600";
+            lokasiTerdekat.className = "text-xs font-bold text-green-600";
+            statusGeo.innerText = "Dalam Radius Absensi";
+            if (!sudahMasuk) btnIn.disabled = false;
+            if (sudahMasuk && !sudahPulang) btnOut.disabled = false;
           } else {
-            statusGeo.innerText = `Terlalu Jauh dari Kantor (Max ${MAX_RADIUS_METERS}m)`;
-            statusGeo.className = "text-xs text-red-500 font-semibold text-center mt-2";
+            banner.className = "rounded-xl p-2 grid grid-cols-2 gap-2 mb-2 bg-red-50";
+            statusGeo.className = "text-xs font-bold text-red-600";
+            lokasiTerdekat.className = "text-xs font-bold text-red-600";
+            statusGeo.innerText = "Di luar Radius Absensi";
             btnIn.disabled = true;
             btnOut.disabled = true;
           }
         }, (err) => {
-          document.getElementById('statusGeo').innerText = "Gagal mengambil lokasi GPS: " + err.message;
+          document.getElementById('statusGeo').innerText = "Gagal ambil lokasi: " + err.message;
         }, { enableHighAccuracy: true, timeout: 10000 });
       } else {
         document.getElementById('statusGeo').innerText = "Browser tidak mendukung Geolokasi.";
       }
     }
 
-    // 6. Fungsi Mengirim Data Presensi ke Google Apps Script
+    // 6. Kirim Presensi
     function submitAbsen(tipe) {
-      // PASTIKAN URL INI SAMA PERSIS DENGAN YANG ADA DI index.html
-      const GAS_URL = "https://script.google.com/macros/s/AKfycbz6KrI9eJPFY9WvyPHXk4TWHWsvFR2KqrVnvMDGJ1xXIjPwOp4ZI_Do5NDAP-R7O-Xp/exec";
-
-      const payload = {
-        action: "absen",
-        nama: currentUser, 
-        tipe: tipe,
-        lat: userLat,
-        lng: userLng,
-        jarak: currentDistance
-      };
-      
       const btnIn = document.getElementById('btnIn');
       const btnOut = document.getElementById('btnOut');
       btnIn.disabled = true;
@@ -176,26 +303,135 @@
 
       fetch(GAS_URL, {
         method: 'POST',
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ action: "absen", nama: currentUser, tipe: tipe, lat: userLat, lng: userLng, jarak: currentDistance })
       })
       .then(response => response.json())
       .then(data => {
-        if(data.status === "success"){
+        if (data.status === "success") {
           alert(`Presensi ${tipe} Berhasil Disimpan!`);
+          cekStatusHariIni();
+          muatRiwayat();
         } else {
           alert(`Gagal: ${data.message}`);
         }
       })
-      .catch(err => {
-        alert("Terjadi kesalahan jaringan: " + err);
-      })
-      .finally(() => {
-        btnIn.disabled = false;
-        btnOut.disabled = false;
-      });
+      .catch(err => alert("Terjadi kesalahan jaringan: " + err))
+      .finally(() => { initGeolocation(); });
     }
 
-    window.onload = initGeolocation;
+    // 7. Cek status masuk/pulang hari ini
+    function cekStatusHariIni() {
+      fetch(`${GAS_URL}?action=status&nama=${encodeURIComponent(currentUser)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === "success") {
+            sudahMasuk = !!data.masuk;
+            sudahPulang = !!data.pulang;
+            document.getElementById('jamMasuk').innerText = data.masuk || '--:--';
+            document.getElementById('jamPulang').innerText = data.pulang || '--:--';
+
+            const pillMasuk = document.getElementById('pillMasuk');
+            const pillPulang = document.getElementById('pillPulang');
+
+            if (sudahMasuk) {
+              pillMasuk.innerText = "Sudah Clock In";
+              pillMasuk.className = "text-[11px] font-semibold px-3 py-1 rounded-full bg-green-100 text-green-700";
+              document.getElementById('btnIn').disabled = true;
+            }
+            if (sudahPulang) {
+              pillPulang.innerText = "Sudah Clock Out";
+              pillPulang.className = "text-[11px] font-semibold px-3 py-1 rounded-full bg-green-100 text-green-700";
+              document.getElementById('btnOut').disabled = true;
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    // 8. Muat Riwayat 7 hari
+    function muatRiwayat() {
+      fetch(`${GAS_URL}?action=riwayat&nama=${encodeURIComponent(currentUser)}`)
+        .then(r => r.json())
+        .then(data => {
+          const cont = document.getElementById('riwayatList');
+          cont.innerHTML = "";
+          if (data.status === "success" && data.data.length > 0) {
+            data.data.forEach(item => {
+              const row = document.createElement('div');
+              row.className = "py-2 flex justify-between";
+              row.innerHTML = `<span class="text-gray-500">${item.tanggal}</span>
+                <span>Masuk: <strong>${item.masuk || '--:--'}</strong>&nbsp;&nbsp;Pulang: <strong>${item.pulang || '--:--'}</strong></span>`;
+              cont.appendChild(row);
+            });
+          } else {
+            cont.innerHTML = '<div class="py-3 text-gray-400 text-center">Belum ada riwayat</div>';
+          }
+        })
+        .catch(() => {
+          document.getElementById('riwayatList').innerHTML = '<div class="py-3 text-red-400 text-center">Gagal memuat riwayat</div>';
+        });
+    }
+
+    // 9. Form Ijin/Cuti
+    document.getElementById('formIjin').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const payload = {
+        action: "ijin",
+        nama: currentUser,
+        jenis: document.getElementById('jenisIjin').value,
+        tglMulai: document.getElementById('tglMulai').value,
+        tglSelesai: document.getElementById('tglSelesai').value,
+        keterangan: document.getElementById('keteranganIjin').value
+      };
+      fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === "success") {
+            alert("Pengajuan Ijin/Cuti berhasil dikirim!");
+            closeModal('modalIjin');
+            e.target.reset();
+          } else {
+            alert("Gagal: " + data.message);
+          }
+        })
+        .catch(err => alert("Terjadi kesalahan jaringan: " + err));
+    });
+
+    // 10. Form Lapor Patroli
+    document.getElementById('formPatroli').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const payload = {
+        action: "patroli",
+        nama: currentUser,
+        catatan: document.getElementById('catatanPatroli').value,
+        lat: userLat,
+        lng: userLng
+      };
+      fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === "success") {
+            alert("Laporan Patroli terkirim!");
+            closeModal('modalPatroli');
+            e.target.reset();
+          } else {
+            alert("Gagal: " + data.message);
+          }
+        })
+        .catch(err => alert("Terjadi kesalahan jaringan: " + err));
+    });
+
+    function syncData() {
+      cekStatusHariIni();
+      muatRiwayat();
+      initGeolocation();
+    }
+
+    window.onload = function () {
+      initGeolocation();
+      cekStatusHariIni();
+      muatRiwayat();
+    };
   </script>
 </body>
 </html>
