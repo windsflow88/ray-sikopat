@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-gradient-to-br from-slate-100 to-blue-50 min-h-screen pb-24">
 
@@ -173,8 +174,13 @@
   </div>
 
   <script>
-    // WAJIB SAMA PERSIS DENGAN index.html
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbz6KrI9eJPFY9WvyPHXk4TWHWsvFR2KqrVnvMDGJ1xXIjPwOp4ZI_Do5NDAP-R7O-Xp/exec";
+    // ============ GANTI DUA NILAI INI SESUAI PROJECT SUPABASE ANDA ============
+    // HARUS SAMA PERSIS DENGAN YANG DI index.html
+    const SUPABASE_URL = "https://czyccnqkbnjdktihflye.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_GMaiiA2Ua2kFSqPjgAtEiA_1vubx6_S";
+    // ============================================================================
+
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // 1. Sesi Login
     const sessionData = localStorage.getItem("session_absen");
@@ -205,7 +211,7 @@
       el.classList.remove('flex');
     }
 
-    // 2. Konfigurasi lokasi kantor (bisa lebih dari satu titik)
+    // 2. Konfigurasi lokasi kantor
     const OFFICE_LOCATIONS = [
       { name: "PT RAY MITRA PERKASA", lat: -6.175392, lng: 106.827153 }
     ];
@@ -218,9 +224,20 @@
     // 3. Jam & Tanggal Realtime
     setInterval(() => {
       const now = new Date();
-      document.getElementById('liveClock').innerText = now.toLocaleTimeString('id-ID', { hour12: false });
-      document.getElementById('liveDate').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      document.getElementById('liveClock').innerText = now.toLocaleTimeString('id-ID', { hour12: false, timeZone: 'Asia/Jakarta' });
+      document.getElementById('liveDate').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' });
     }, 1000);
+
+    function tglJakarta(dateInput) {
+      return new Date(dateInput).toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+    }
+    function jamJakarta(dateInput) {
+      return new Date(dateInput).toLocaleTimeString('id-ID', { hour12: false, timeZone: 'Asia/Jakarta' }).substring(0, 5);
+    }
+    function tglIndo(isoDate) {
+      const [y, m, d] = isoDate.split('-');
+      return `${d}/${m}/${y}`;
+    }
 
     // 4. Haversine
     function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -294,131 +311,155 @@
       }
     }
 
-    // 6. Kirim Presensi
-    function submitAbsen(tipe) {
+    // 6. Kirim Presensi -> insert ke tabel log_absensi
+    async function submitAbsen(tipe) {
       const btnIn = document.getElementById('btnIn');
       const btnOut = document.getElementById('btnOut');
       btnIn.disabled = true;
       btnOut.disabled = true;
 
-      fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: "absen", nama: currentUser, tipe: tipe, lat: userLat, lng: userLng, jarak: currentDistance })
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.status === "success") {
-          alert(`Presensi ${tipe} Berhasil Disimpan!`);
-          cekStatusHariIni();
-          muatRiwayat();
-        } else {
-          alert(`Gagal: ${data.message}`);
-        }
-      })
-      .catch(err => alert("Terjadi kesalahan jaringan: " + err))
-      .finally(() => { initGeolocation(); });
+      const { error } = await sb.from('log_absensi').insert({
+        nama: currentUser,
+        tipe: tipe,
+        lat: userLat,
+        lng: userLng,
+        jarak: currentDistance
+      });
+
+      if (!error) {
+        alert(`Presensi ${tipe} Berhasil Disimpan!`);
+        await cekStatusHariIni();
+        await muatRiwayat();
+      } else {
+        alert("Gagal: " + error.message);
+      }
+      initGeolocation();
     }
 
     // 7. Cek status masuk/pulang hari ini
-    function cekStatusHariIni() {
-      fetch(`${GAS_URL}?action=status&nama=${encodeURIComponent(currentUser)}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.status === "success") {
-            sudahMasuk = !!data.masuk;
-            sudahPulang = !!data.pulang;
-            document.getElementById('jamMasuk').innerText = data.masuk || '--:--';
-            document.getElementById('jamPulang').innerText = data.pulang || '--:--';
+    async function cekStatusHariIni() {
+      const { data, error } = await sb
+        .from('log_absensi')
+        .select('tipe, waktu')
+        .eq('nama', currentUser)
+        .order('waktu', { ascending: false })
+        .limit(30);
 
-            const pillMasuk = document.getElementById('pillMasuk');
-            const pillPulang = document.getElementById('pillPulang');
+      if (error || !data) return;
 
-            if (sudahMasuk) {
-              pillMasuk.innerText = "Sudah Clock In";
-              pillMasuk.className = "text-[11px] font-semibold px-3 py-1 rounded-full bg-green-100 text-green-700";
-              document.getElementById('btnIn').disabled = true;
-            }
-            if (sudahPulang) {
-              pillPulang.innerText = "Sudah Clock Out";
-              pillPulang.className = "text-[11px] font-semibold px-3 py-1 rounded-full bg-green-100 text-green-700";
-              document.getElementById('btnOut').disabled = true;
-            }
-          }
-        })
-        .catch(() => {});
+      const todayStr = tglJakarta(new Date());
+      let masuk = null, pulang = null;
+
+      data.forEach(row => {
+        if (tglJakarta(row.waktu) === todayStr) {
+          if (row.tipe === 'MASUK' && !masuk) masuk = jamJakarta(row.waktu);
+          if (row.tipe === 'PULANG' && !pulang) pulang = jamJakarta(row.waktu);
+        }
+      });
+
+      sudahMasuk = !!masuk;
+      sudahPulang = !!pulang;
+      document.getElementById('jamMasuk').innerText = masuk || '--:--';
+      document.getElementById('jamPulang').innerText = pulang || '--:--';
+
+      const pillMasuk = document.getElementById('pillMasuk');
+      const pillPulang = document.getElementById('pillPulang');
+
+      if (sudahMasuk) {
+        pillMasuk.innerText = "Sudah Clock In";
+        pillMasuk.className = "text-[11px] font-semibold px-3 py-1 rounded-full bg-green-100 text-green-700";
+        document.getElementById('btnIn').disabled = true;
+      }
+      if (sudahPulang) {
+        pillPulang.innerText = "Sudah Clock Out";
+        pillPulang.className = "text-[11px] font-semibold px-3 py-1 rounded-full bg-green-100 text-green-700";
+        document.getElementById('btnOut').disabled = true;
+      }
     }
 
-    // 8. Muat Riwayat 7 hari
-    function muatRiwayat() {
-      fetch(`${GAS_URL}?action=riwayat&nama=${encodeURIComponent(currentUser)}`)
-        .then(r => r.json())
-        .then(data => {
-          const cont = document.getElementById('riwayatList');
-          cont.innerHTML = "";
-          if (data.status === "success" && data.data.length > 0) {
-            data.data.forEach(item => {
-              const row = document.createElement('div');
-              row.className = "py-2 flex justify-between";
-              row.innerHTML = `<span class="text-gray-500">${item.tanggal}</span>
-                <span>Masuk: <strong>${item.masuk || '--:--'}</strong>&nbsp;&nbsp;Pulang: <strong>${item.pulang || '--:--'}</strong></span>`;
-              cont.appendChild(row);
-            });
-          } else {
-            cont.innerHTML = '<div class="py-3 text-gray-400 text-center">Belum ada riwayat</div>';
-          }
-        })
-        .catch(() => {
-          document.getElementById('riwayatList').innerHTML = '<div class="py-3 text-red-400 text-center">Gagal memuat riwayat</div>';
-        });
+    // 8. Muat Riwayat 7 hari terakhir
+    async function muatRiwayat() {
+      const cont = document.getElementById('riwayatList');
+      const batas = new Date();
+      batas.setDate(batas.getDate() - 10);
+
+      const { data, error } = await sb
+        .from('log_absensi')
+        .select('tipe, waktu')
+        .eq('nama', currentUser)
+        .gte('waktu', batas.toISOString())
+        .order('waktu', { ascending: false });
+
+      if (error || !data) {
+        cont.innerHTML = '<div class="py-3 text-red-400 text-center">Gagal memuat riwayat</div>';
+        return;
+      }
+
+      const perTanggal = {};
+      data.forEach(row => {
+        const tgl = tglJakarta(row.waktu);
+        if (!perTanggal[tgl]) perTanggal[tgl] = { masuk: null, pulang: null };
+        if (row.tipe === 'MASUK' && !perTanggal[tgl].masuk) perTanggal[tgl].masuk = jamJakarta(row.waktu);
+        if (row.tipe === 'PULANG' && !perTanggal[tgl].pulang) perTanggal[tgl].pulang = jamJakarta(row.waktu);
+      });
+
+      const tanggalList = Object.keys(perTanggal).sort().reverse().slice(0, 7);
+
+      cont.innerHTML = "";
+      if (tanggalList.length === 0) {
+        cont.innerHTML = '<div class="py-3 text-gray-400 text-center">Belum ada riwayat</div>';
+        return;
+      }
+
+      tanggalList.forEach(tgl => {
+        const item = perTanggal[tgl];
+        const row = document.createElement('div');
+        row.className = "py-2 flex justify-between";
+        row.innerHTML = `<span class="text-gray-500">${tglIndo(tgl)}</span>
+          <span>Masuk: <strong>${item.masuk || '--:--'}</strong>&nbsp;&nbsp;Pulang: <strong>${item.pulang || '--:--'}</strong></span>`;
+        cont.appendChild(row);
+      });
     }
 
-    // 9. Form Ijin/Cuti
-    document.getElementById('formIjin').addEventListener('submit', function (e) {
+    // 9. Form Ijin/Cuti -> insert ke tabel log_ijin
+    document.getElementById('formIjin').addEventListener('submit', async function (e) {
       e.preventDefault();
-      const payload = {
-        action: "ijin",
+
+      const { error } = await sb.from('log_ijin').insert({
         nama: currentUser,
         jenis: document.getElementById('jenisIjin').value,
-        tglMulai: document.getElementById('tglMulai').value,
-        tglSelesai: document.getElementById('tglSelesai').value,
+        tanggal_mulai: document.getElementById('tglMulai').value,
+        tanggal_selesai: document.getElementById('tglSelesai').value,
         keterangan: document.getElementById('keteranganIjin').value
-      };
-      fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
-        .then(r => r.json())
-        .then(data => {
-          if (data.status === "success") {
-            alert("Pengajuan Ijin/Cuti berhasil dikirim!");
-            closeModal('modalIjin');
-            e.target.reset();
-          } else {
-            alert("Gagal: " + data.message);
-          }
-        })
-        .catch(err => alert("Terjadi kesalahan jaringan: " + err));
+      });
+
+      if (!error) {
+        alert("Pengajuan Ijin/Cuti berhasil dikirim!");
+        closeModal('modalIjin');
+        e.target.reset();
+      } else {
+        alert("Gagal: " + error.message);
+      }
     });
 
-    // 10. Form Lapor Patroli
-    document.getElementById('formPatroli').addEventListener('submit', function (e) {
+    // 10. Form Lapor Patroli -> insert ke tabel log_patroli
+    document.getElementById('formPatroli').addEventListener('submit', async function (e) {
       e.preventDefault();
-      const payload = {
-        action: "patroli",
+
+      const { error } = await sb.from('log_patroli').insert({
         nama: currentUser,
         catatan: document.getElementById('catatanPatroli').value,
         lat: userLat,
         lng: userLng
-      };
-      fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
-        .then(r => r.json())
-        .then(data => {
-          if (data.status === "success") {
-            alert("Laporan Patroli terkirim!");
-            closeModal('modalPatroli');
-            e.target.reset();
-          } else {
-            alert("Gagal: " + data.message);
-          }
-        })
-        .catch(err => alert("Terjadi kesalahan jaringan: " + err));
+      });
+
+      if (!error) {
+        alert("Laporan Patroli terkirim!");
+        closeModal('modalPatroli');
+        e.target.reset();
+      } else {
+        alert("Gagal: " + error.message);
+      }
     });
 
     function syncData() {
